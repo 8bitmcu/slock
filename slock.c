@@ -1,5 +1,6 @@
 /* See LICENSE file for license details. */
 #define _XOPEN_SOURCE 500
+#define LENGTH(X)       (sizeof X / sizeof X[0])
 #if HAVE_SHADOW_H
 #include <shadow.h>
 #endif
@@ -35,6 +36,7 @@ static time_t locktime;
 int count_error = 0;
 
 enum {
+  FOREGROUND,
 	INIT,
 	INPUT,
 	INPUT_ALT,
@@ -42,12 +44,18 @@ enum {
 	NUMCOLS
 };
 
+#include "config.h"
+
 struct lock {
 	int screen;
 	Window root, win;
 	Pixmap pmap;
 	Pixmap bgmap;
 	unsigned long colors[NUMCOLS];
+  unsigned int x, y;
+  unsigned int xoff, yoff, mw, mh;
+  Drawable drawable;
+  GC gc;
 };
 
 struct xrandr {
@@ -55,8 +63,6 @@ struct xrandr {
 	int evbase;
 	int errbase;
 };
-
-#include "config.h"
 
 Imlib_Image image;
 
@@ -98,7 +104,7 @@ dontkillme(void)
 #endif
 
 static void
-writemessage(Display *dpy, Window win, int screen, char* font_name, char* message, int offset)
+writemessage(Display *dpy, Window win, int screen, const char* font_name, const char* message, int offset, const char * color)
 {
 	int len, line_len, width, height, s_width, s_height, i, j, k, tab_replace, tab_size;
 	XftFont *fontinfo;
@@ -108,7 +114,7 @@ writemessage(Display *dpy, Window win, int screen, char* font_name, char* messag
 	XineramaScreenInfo *xsi;
 	xftdraw = XftDrawCreate(dpy, win, DefaultVisual(dpy, screen), DefaultColormap(dpy, screen));
 	fontinfo = XftFontOpenName(dpy, screen, font_name);
-	XftColorAllocName(dpy, DefaultVisual(dpy, screen), DefaultColormap(dpy, screen), text_color, &xftcolor);
+	XftColorAllocName(dpy, DefaultVisual(dpy, screen), DefaultColormap(dpy, screen), color, &xftcolor);
 
 	if (fontinfo == NULL) {
 		if (count_error == 0) {
@@ -316,9 +322,9 @@ readpw(Display *dpy, struct xrandr *rr, struct lock **locks, int nscreens,
               XSetWindowBackgroundPixmap(dpy, locks[screen]->win, locks[screen]->bgmap);
           else
               XSetWindowBackground(dpy, locks[screen]->win, locks[screen]->colors[0]);
-					XClearWindow(dpy, locks[screen]->win);
-					writemessage(dpy, locks[screen]->win, screen, icon_font, display_icon, 0);
-					writemessage(dpy, locks[screen]->win, screen, text_font, display_text, 100);
+					//XClearWindow(dpy, locks[screen]->win);
+					writemessage(dpy, locks[screen]->win, screen, icon_font, display_icon, 0, colorname[color]);
+					writemessage(dpy, locks[screen]->win, screen, text_font, display_text, 100, colorname[FOREGROUND]);
 				}
 				oldc = color;
 			}
@@ -353,6 +359,10 @@ lockscreen(Display *dpy, struct xrandr *rr, int screen)
 	XColor color, dummy;
 	XSetWindowAttributes wa;
 	Cursor invisible;
+#ifdef XINERAMA
+	XineramaScreenInfo *info;
+	int n;
+#endif
 
 	if (dpy == NULL || screen < 0 || !(lock = malloc(sizeof(struct lock))))
 		return NULL;
@@ -377,12 +387,31 @@ lockscreen(Display *dpy, struct xrandr *rr, int screen)
 		lock->colors[i] = color.pixel;
 	}
 
+	lock->x = DisplayWidth(dpy, lock->screen);
+	lock->y = DisplayHeight(dpy, lock->screen);
+#ifdef XINERAMA
+	if ((info = XineramaQueryScreens(dpy, &n))) {
+		lock->xoff = info[0].x_org;
+		lock->yoff = info[0].y_org;
+		lock->mw = info[0].width;
+		lock->mh = info[0].height;
+	} else
+#endif
+	{
+		lock->xoff = lock->yoff = 0;
+		lock->mw = lock->x;
+		lock->mh = lock->y;
+	}
+	lock->drawable = XCreatePixmap(dpy, lock->root,
+            lock->x, lock->y, DefaultDepth(dpy, screen));
+	lock->gc = XCreateGC(dpy, lock->root, 0, NULL);
+	XSetLineAttributes(dpy, lock->gc, 1, LineSolid, CapButt, JoinMiter);
+
 	/* init */
 	wa.override_redirect = 1;
-	wa.background_pixel = lock->colors[INIT];
+	wa.background_pixel = lock->colors[FOREGROUND];
 	lock->win = XCreateWindow(dpy, lock->root, 0, 0,
-	                          DisplayWidth(dpy, lock->screen),
-	                          DisplayHeight(dpy, lock->screen),
+	                          lock->x, lock->y,
 	                          0, DefaultDepth(dpy, lock->screen),
 	                          CopyFromParent,
 	                          DefaultVisual(dpy, lock->screen),
@@ -569,8 +598,8 @@ main(int argc, char **argv) {
 		die("slock: out of memory\n");
 	for (nlocks = 0, s = 0; s < nscreens; s++) {
 		if ((locks[s] = lockscreen(dpy, &rr, s)) != NULL) {
-      writemessage(dpy, locks[s]->win, s, icon_font, display_icon, 0);
-      writemessage(dpy, locks[s]->win, s, text_font, display_text, 100);
+      writemessage(dpy, locks[s]->win, s, icon_font, display_icon, 0, colorname[FOREGROUND]);
+      writemessage(dpy, locks[s]->win, s, text_font, display_text, 100, colorname[FOREGROUND]);
 			nlocks++;
     }
 		else
@@ -599,5 +628,12 @@ main(int argc, char **argv) {
 	/* everything is now blank. Wait for the correct password */
 	readpw(dpy, &rr, locks, nscreens, hash);
 
+	for (nlocks = 0, s = 0; s < nscreens; s++) {
+		XFreePixmap(dpy, locks[s]->drawable);
+		XFreeGC(dpy, locks[s]->gc);
+	}
+
+	XSync(dpy, 0);
+	XCloseDisplay(dpy);
 	return 0;
 }
