@@ -16,11 +16,12 @@ static const char *colorname[NUMCOLS] = {
 static const int failonclear = 1;
 
 /*Enable blur*/
-//#define BLUR
+static const int enable_blur = 0;
 /*Set blur radius*/
 static const int blurRadius = 0;
+
 /*Enable Pixelation*/
-#define PIXELATION
+static const int enable_pixel = 1;
 /*Set pixelation radius*/
 static const int pixelSize = 8;
 
@@ -43,3 +44,6 @@ static const char *failcommand = "shutdown -h now";
 
 /* allow control key to trigger fail on clear */
 static const int controlkeyclear = 0;
+
+/* time in seconds before the monitor shuts down */
+static const int monitortime = 30;

@@ -1,6 +1,5 @@
 /* See LICENSE file for license details. */
 #define _XOPEN_SOURCE 500
-#define LENGTH(X)       (sizeof X / sizeof X[0])
 #if HAVE_SHADOW_H
 #include <shadow.h>
 #endif
@@ -18,12 +17,14 @@
 #include <sys/types.h>
 #include <X11/extensions/Xrandr.h>
 #include <X11/extensions/Xinerama.h>
+#include <X11/extensions/dpms.h>
 #include <X11/keysym.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xft/Xft.h>
 #include <X11/XF86keysym.h>
 #include <X11/XKBlib.h>
+#include <X11/Xmd.h>
 #include <Imlib2.h>
 
 #include "arg.h"
@@ -499,6 +500,8 @@ main(int argc, char **argv) {
 	gid_t dgid;
 	const char *hash;
 	Display *dpy;
+	CARD16 standby, suspend, off;
+	BOOL dpms_state;
 	int i, s, nlocks, nscreens;
 	int count_fonts;
 	char **font_names;
@@ -563,49 +566,49 @@ main(int argc, char **argv) {
 	imlib_context_set_drawable(RootWindow(dpy,XScreenNumberOfScreen(scr)));	
 	imlib_copy_drawable_to_image(0,0,0,scr->width,scr->height,0,0,1);
 
-#ifdef BLUR
-	/*Blur function*/
-	imlib_image_blur(blurRadius);
-#endif
 
+  if (enable_blur > 0) {
+    /*Blur function*/
+    imlib_image_blur(blurRadius);
+  }
 
-#ifdef PIXELATION
-	/*Pixelation*/
-	int width = scr->width;
-	int height = scr->height;
-	
-	for(int y = 0; y < height; y += pixelSize)
-	{
-		for(int x = 0; x < width; x += pixelSize)
-		{
-			int red = 0;
-			int green = 0;
-			int blue = 0;
+  if (enable_pixel > 0) {
+    /*Pixelation*/
+    int width = scr->width;
+    int height = scr->height;
+    
+    for(int y = 0; y < height; y += pixelSize)
+    {
+      for(int x = 0; x < width; x += pixelSize)
+      {
+        int red = 0;
+        int green = 0;
+        int blue = 0;
 
-			Imlib_Color pixel; 
-			Imlib_Color* pp;
-			pp = &pixel;
-			for(int j = 0; j < pixelSize && j < height; j++)
-			{
-				for(int i = 0; i < pixelSize && i < width; i++)
-				{
-					imlib_image_query_pixel(x+i,y+j,pp);
-					red += pixel.red;
-					green += pixel.green;
-					blue += pixel.blue;
-				}
-			}
-			red /= (pixelSize*pixelSize);
-			green /= (pixelSize*pixelSize);
-			blue /= (pixelSize*pixelSize);
-			imlib_context_set_color(red,green,blue,pixel.alpha);
-			imlib_image_fill_rectangle(x,y,pixelSize,pixelSize);
-			red = 0;
-			green = 0;
-			blue = 0;
-		}
-	}
-#endif	
+        Imlib_Color pixel; 
+        Imlib_Color* pp;
+        pp = &pixel;
+        for(int j = 0; j < pixelSize && j < height; j++)
+        {
+          for(int i = 0; i < pixelSize && i < width; i++)
+          {
+            imlib_image_query_pixel(x+i,y+j,pp);
+            red += pixel.red;
+            green += pixel.green;
+            blue += pixel.blue;
+          }
+        }
+        red /= (pixelSize*pixelSize);
+        green /= (pixelSize*pixelSize);
+        blue /= (pixelSize*pixelSize);
+        imlib_context_set_color(red,green,blue,pixel.alpha);
+        imlib_image_fill_rectangle(x,y,pixelSize,pixelSize);
+        red = 0;
+        green = 0;
+        blue = 0;
+      }
+    }
+  }
 	
 	/* check for Xrandr support */
 	rr.active = XRRQueryExtension(dpy, &rr.evbase, &rr.errbase);
@@ -629,6 +632,23 @@ main(int argc, char **argv) {
 	if (nlocks != nscreens)
 		return 1;
 
+	/* DPMS magic to disable the monitor */
+	if (!DPMSCapable(dpy))
+		die("slock: DPMSCapable failed\n");
+	if (!DPMSInfo(dpy, &standby, &dpms_state))
+		die("slock: DPMSInfo failed\n");
+	if (!DPMSEnable(dpy) && !dpms_state)
+		die("slock: DPMSEnable failed\n");
+	if (!DPMSGetTimeouts(dpy, &standby, &suspend, &off))
+		die("slock: DPMSGetTimeouts failed\n");
+	if (!standby || !suspend || !off)
+		die("slock: at least one DPMS variable is zero\n");
+	if (!DPMSSetTimeouts(dpy, monitortime, monitortime, monitortime))
+		die("slock: DPMSSetTimeouts failed\n");
+
+	XSync(dpy, 0);
+
+
 	/* run post-lock command */
 	if (argc > 0) {
 		switch (fork()) {
@@ -651,7 +671,12 @@ main(int argc, char **argv) {
 		XFreeGC(dpy, locks[s]->gc);
 	}
 
+	/* reset DPMS values to inital ones */
+	DPMSSetTimeouts(dpy, standby, suspend, off);
+	if (!dpms_state)
+		DPMSDisable(dpy);
 	XSync(dpy, 0);
+
 	XCloseDisplay(dpy);
 	return 0;
 }
