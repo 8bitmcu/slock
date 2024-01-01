@@ -32,7 +32,6 @@ Building and installing
 Previews
 --------
 
-
-
+![slock](assets/preview.png)
 
 
