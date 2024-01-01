@@ -19,6 +19,7 @@ This fork merges the following patches:
 And adds the following other changes:
 - **lock icon** instead of the dwm logo (configurable)
 - **quick cancel** using any keyboard key
+- **load image** to use as a background
 - **configuration file**; using libconfig to loads configuration from `$XDG_CONFIG_HOME/slock/slock.cfg` if it exists
 
 
@@ -35,4 +36,5 @@ Previews
 
 ![slock](assets/preview.png)
 
+![slock](assets/apple.png)
 

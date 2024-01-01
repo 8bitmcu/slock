@@ -625,6 +625,8 @@ main(int argc, char **argv) {
       failcommand = strdup(str);
     if (config_lookup_string(&cfg, "pam_service", &str))
       pam_service = strdup(str);
+    if (config_lookup_string(&cfg, "bgimage", &str))
+      bgimage = strdup(str);
   }
 
 
@@ -675,12 +677,22 @@ main(int argc, char **argv) {
 
 	/*Create screenshot Image*/
   Screen *scr = ScreenOfDisplay(dpy, DefaultScreen(dpy));
-	image = imlib_create_image(scr->width,scr->height);
-	imlib_context_set_image(image);
-	imlib_context_set_display(dpy);
-	imlib_context_set_visual(DefaultVisual(dpy,0));
-	imlib_context_set_drawable(RootWindow(dpy,XScreenNumberOfScreen(scr)));	
-	imlib_copy_drawable_to_image(0,0,0,scr->width,scr->height,0,0,1);
+
+  if (strcmp(bgimage, "")) {
+    image = imlib_load_image(bgimage);
+    imlib_context_set_image(image);
+    int w = imlib_image_get_width();
+    int h = imlib_image_get_height();
+    image = imlib_create_cropped_scaled_image(0, 0, w, h, scr->width, scr->height);
+  }
+  else {
+    image = imlib_create_image(scr->width,scr->height);
+    imlib_context_set_image(image);
+    imlib_context_set_display(dpy);
+    imlib_context_set_visual(DefaultVisual(dpy,0));
+    imlib_context_set_drawable(RootWindow(dpy,XScreenNumberOfScreen(scr)));	
+    imlib_copy_drawable_to_image(0,0,0,scr->width,scr->height,0,0,1);
+  }
 
 
   if (enableblur > 0) {
