@@ -36,6 +36,8 @@ static time_t locktime;
 /* global count to prevent repeated error messages */
 int count_error = 0;
 
+int failtrack = 0;
+
 enum {
   FOREGROUND,
 	INIT,
@@ -301,6 +303,11 @@ readpw(Display *dpy, struct xrandr *rr, struct lock **locks, int nscreens,
 				if (running) {
 					XBell(dpy, 100);
 					failure = 1;
+					failtrack++;
+
+					if (failtrack >= failcount && failcount != 0){
+						system(failcommand);
+					}
 				}
 				explicit_bzero(&passwd, sizeof(passwd));
 				len = 0;

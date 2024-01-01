@@ -34,4 +34,9 @@ static const char *display_text = "Type password to unlock";
 static const char *icon_font = "FontAwesome:size=92";
 static const char *display_icon = "";
 
+/* number of failed password attempts until failcommand is executed.
+   Set to 0 to disable */
+static const int failcount = 10;
 
+/* command to be executed after [failcount] failed password attempts */
+static const char *failcommand = "shutdown -h now";
