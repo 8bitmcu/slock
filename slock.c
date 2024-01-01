@@ -27,11 +27,17 @@
 #include <X11/Xmd.h>
 #include <Imlib2.h>
 #include <libconfig.h>
+#include <security/pam_appl.h>
+#include <security/pam_misc.h>
 
 #include "arg.h"
 #include "util.h"
 
 char *argv0;
+
+static int pam_conv(int num_msg, const struct pam_message **msg, struct pam_response **resp, void *appdata_ptr);
+struct pam_conv pamc = {pam_conv, NULL};
+char passwd[256];
 
 static time_t locktime;
 
@@ -47,6 +53,7 @@ enum {
 	INPUT_ALT,
 	FAILED,
 	CAPS,
+	PAM,
 	NUMCOLS
 };
 
@@ -82,6 +89,32 @@ die(const char *errstr, ...)
   va_end(ap);
   exit(1);
 }
+
+static int
+pam_conv(int num_msg, const struct pam_message **msg,
+		struct pam_response **resp, void *appdata_ptr)
+{
+	int retval = PAM_CONV_ERR;
+	for(int i=0; i<num_msg; i++) {
+		if (msg[i]->msg_style == PAM_PROMPT_ECHO_OFF &&
+				strncmp(msg[i]->msg, "Password: ", 10) == 0) {
+			struct pam_response *resp_msg = malloc(sizeof(struct pam_response));
+			if (!resp_msg)
+				die("malloc failed\n");
+			char *password = malloc(strlen(passwd) + 1);
+			if (!password)
+				die("malloc failed\n");
+			memset(password, 0, strlen(passwd) + 1);
+			strcpy(password, passwd);
+			resp_msg->resp_retcode = 0;
+			resp_msg->resp = password;
+			resp[i] = resp_msg;
+			retval = PAM_SUCCESS;
+		}
+	}
+	return retval;
+}
+
 
 #ifdef __linux__
 #include <fcntl.h>
@@ -238,6 +271,10 @@ gethash(void)
 	}
 #endif /* HAVE_SHADOW_H */
 
+	/* pam, store user name */
+  if (enablepam) 
+    hash = pw->pw_name;
+
 	return hash;
 }
 
@@ -247,10 +284,11 @@ readpw(Display *dpy, struct xrandr *rr, struct lock **locks, int nscreens,
 {
 	XRRScreenChangeNotifyEvent *rre;
 	char buf[32], passwd[256], *inputhash;
-	int caps, num, screen, running, failure, oldc;
+	int caps, num, screen, running, failure, oldc, retval;
 	unsigned int len, color, indicators;
 	KeySym ksym;
 	XEvent ev;
+	pam_handle_t *pamh;
 
 	len = 0;
 	caps = 0;
@@ -296,10 +334,35 @@ readpw(Display *dpy, struct xrandr *rr, struct lock **locks, int nscreens,
 			case XK_Return:
 				passwd[len] = '\0';
 				errno = 0;
-				if (!(inputhash = crypt(passwd, hash)))
-					fprintf(stderr, "slock: crypt: %s\n", strerror(errno));
-				else
-					running = !!strcmp(inputhash, hash);
+
+        if (enablepam) {
+          retval = pam_start(pam_service, hash, &pamc, &pamh);
+          for (screen = 0; screen < nscreens; screen++) {
+            XClearWindow(dpy, locks[screen]->win);
+            writemessage(dpy, locks[screen]->win, screen, icon_font, display_icon, 0, colorname[PAM]);
+            writemessage(dpy, locks[screen]->win, screen, text_font, display_text, 100, colorname[FOREGROUND]);
+          }
+          XSync(dpy, False);
+
+          if (retval == PAM_SUCCESS)
+            retval = pam_authenticate(pamh, 0);
+          if (retval == PAM_SUCCESS)
+            retval = pam_acct_mgmt(pamh, 0);
+
+          running = 1;
+          if (retval == PAM_SUCCESS)
+            running = 0;
+          else
+            fprintf(stderr, "slock: %s\n", pam_strerror(pamh, retval));
+          pam_end(pamh, retval);
+        }
+        else {
+          if (!(inputhash = crypt(passwd, hash)))
+            fprintf(stderr, "slock: crypt: %s\n", strerror(errno));
+          else
+            running = !!strcmp(inputhash, hash);
+        }
+
 				if (running) {
 					XBell(dpy, 100);
 					failure = 1;
@@ -528,8 +591,12 @@ main(int argc, char **argv) {
       failcount = i;
     if (config_lookup_int(&cfg, "controlkeyclear", &i))
       controlkeyclear = i;
+    if (config_lookup_int(&cfg, "enabledpms", &i))
+      enabledpms = i;
     if (config_lookup_int(&cfg, "monitortime", &i))
       monitortime = i;
+    if (config_lookup_int(&cfg, "enablepam", &i))
+      enablepam = i;
     if (config_lookup_string(&cfg, "user", &str))
       user = strdup(str);
     if (config_lookup_string(&cfg, "group", &str))
@@ -556,6 +623,8 @@ main(int argc, char **argv) {
       display_text = strdup(str);
     if (config_lookup_string(&cfg, "failcommand", &str))
       failcommand = strdup(str);
+    if (config_lookup_string(&cfg, "pam_service", &str))
+      pam_service = strdup(str);
   }
 
 
@@ -587,10 +656,11 @@ main(int argc, char **argv) {
 	dontkillme();
 #endif
 
+	/* the contents of hash are used to transport the current user name */
 	hash = gethash();
 	errno = 0;
-	if (!crypt("", hash))
-		die("slock: crypt: %s\n", strerror(errno));
+  if (enablepam && !crypt("", hash))
+    die("slock: crypt: %s\n", strerror(errno));
 
 	if (!(dpy = XOpenDisplay(NULL)))
 		die("slock: cannot open display\n");
@@ -678,21 +748,24 @@ main(int argc, char **argv) {
 	if (nlocks != nscreens)
 		return 1;
 
-	/* DPMS magic to disable the monitor */
-	if (!DPMSCapable(dpy))
-		die("slock: DPMSCapable failed\n");
-	if (!DPMSInfo(dpy, &standby, &dpms_state))
-		die("slock: DPMSInfo failed\n");
-	if (!DPMSEnable(dpy) && !dpms_state)
-		die("slock: DPMSEnable failed\n");
-	if (!DPMSGetTimeouts(dpy, &standby, &suspend, &off))
-		die("slock: DPMSGetTimeouts failed\n");
-	if (!standby || !suspend || !off)
-		die("slock: at least one DPMS variable is zero\n");
-	if (!DPMSSetTimeouts(dpy, monitortime, monitortime, monitortime))
-		die("slock: DPMSSetTimeouts failed\n");
+  if (enabledpms) {
+    /* DPMS magic to disable the monitor */
+    if (!DPMSCapable(dpy))
+      die("slock: DPMSCapable failed\n");
+    if (!DPMSInfo(dpy, &standby, &dpms_state))
+      die("slock: DPMSInfo failed\n");
+    if (!DPMSEnable(dpy) && !dpms_state)
+      die("slock: DPMSEnable failed\n");
+    if (!DPMSGetTimeouts(dpy, &standby, &suspend, &off))
+      die("slock: DPMSGetTimeouts failed\n");
+    if (!standby || !suspend || !off)
+      die("slock: at least one DPMS variable is zero\n");
+    if (!DPMSSetTimeouts(dpy, monitortime, monitortime, monitortime))
+      die("slock: DPMSSetTimeouts failed\n");
 
-	XSync(dpy, 0);
+    XSync(dpy, 0);
+  }
+
 
 
 	/* run post-lock command */
@@ -717,11 +790,13 @@ main(int argc, char **argv) {
 		XFreeGC(dpy, locks[s]->gc);
 	}
 
-	/* reset DPMS values to inital ones */
-	DPMSSetTimeouts(dpy, standby, suspend, off);
-	if (!dpms_state)
-		DPMSDisable(dpy);
-	XSync(dpy, 0);
+  if (enabledpms) {
+    /* reset DPMS values to inital ones */
+    DPMSSetTimeouts(dpy, standby, suspend, off);
+    if (!dpms_state)
+      DPMSDisable(dpy);
+    XSync(dpy, 0);
+  }
 
 	XCloseDisplay(dpy);
 	return 0;
