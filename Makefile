@@ -38,6 +38,8 @@ install: all
 	mkdir -p ${DESTDIR}${MANPREFIX}/man1
 	sed "s/VERSION/${VERSION}/g" <slock.1 >${DESTDIR}${MANPREFIX}/man1/slock.1
 	chmod 644 ${DESTDIR}${MANPREFIX}/man1/slock.1
+	mkdir -p /etc/slock
+	cp -f slock.cfg /etc/slock
 
 uninstall:
 	rm -f ${DESTDIR}${PREFIX}/bin/slock

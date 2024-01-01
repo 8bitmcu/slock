@@ -1,3 +1,5 @@
+/* configuration file location, subdirectory of XDG_CONFIG_HOME */
+static const char *slock_cfg = "/slock/slock.cfg";
 
 /* user and group to drop privileges to */
 static const char *user  = "nobody";
@@ -13,37 +15,39 @@ static const char *colorname[NUMCOLS] = {
 };
 
 /* treat a cleared input like a wrong password (color) */
-static const int failonclear = 1;
+static int failonclear = 1;
 
 /*Enable blur*/
-static const int enable_blur = 0;
+static int enableblur = 0;
+
 /*Set blur radius*/
-static const int blurRadius = 0;
+static int blurradius = 0;
 
 /*Enable Pixelation*/
-static const int enable_pixel = 1;
+static int enablepixel = 1;
+
 /*Set pixelation radius*/
-static const int pixelSize = 8;
+static int pixelsize = 8;
 
 
-/* time in seconds to cancel lock with mouse movement */
-static const int timetocancel = 2;
-
-static const char *text_font = "San Francisco:size=20";
-static const char *display_text = "Type password to unlock";
+/* time in seconds to cancel lock with mouse movement or keyboard input */
+static int timetocancel = 3;
 
 static const char *icon_font = "FontAwesome:size=92";
 static const char *display_icon = "";
 
+static const char *text_font = "San Francisco:size=20";
+static const char *display_text = "Type password to unlock";
+
 /* number of failed password attempts until failcommand is executed.
    Set to 0 to disable */
-static const int failcount = 10;
+static int failcount = 10;
 
 /* command to be executed after [failcount] failed password attempts */
 static const char *failcommand = "shutdown -h now";
 
 /* allow control key to trigger fail on clear */
-static const int controlkeyclear = 0;
+static int controlkeyclear = 0;
 
 /* time in seconds before the monitor shuts down */
-static const int monitortime = 30;
+static int monitortime = 30;

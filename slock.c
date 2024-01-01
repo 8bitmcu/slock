@@ -26,6 +26,7 @@
 #include <X11/XKBlib.h>
 #include <X11/Xmd.h>
 #include <Imlib2.h>
+#include <libconfig.h>
 
 #include "arg.h"
 #include "util.h"
@@ -107,6 +108,7 @@ dontkillme(void)
 	}
 }
 #endif
+
 
 static void
 writemessage(Display *dpy, Window win, int screen, const char* font_name, const char* message, int offset, const char * color)
@@ -197,9 +199,6 @@ writemessage(Display *dpy, Window win, int screen, const char* font_name, const 
 	XftColorFree(dpy, DefaultVisual(dpy, screen), DefaultColormap(dpy, screen), &xftcolor);
 	XftDrawDestroy(xftdraw);
 }
-
-
-
 
 static const char *
 gethash(void)
@@ -341,9 +340,9 @@ readpw(Display *dpy, struct xrandr *rr, struct lock **locks, int nscreens,
               XSetWindowBackgroundPixmap(dpy, locks[screen]->win, locks[screen]->bgmap);
           else
               XSetWindowBackground(dpy, locks[screen]->win, locks[screen]->colors[0]);
-					//XClearWindow(dpy, locks[screen]->win);
-					writemessage(dpy, locks[screen]->win, screen, icon_font, display_icon, 0, colorname[color]);
-					writemessage(dpy, locks[screen]->win, screen, text_font, display_text, 100, colorname[FOREGROUND]);
+					XClearWindow(dpy, locks[screen]->win);
+          writemessage(dpy, locks[screen]->win, screen, icon_font, display_icon, 0, colorname[color]);
+          writemessage(dpy, locks[screen]->win, screen, text_font, display_text, 100, colorname[FOREGROUND]);
 				}
 				oldc = color;
 			}
@@ -502,9 +501,64 @@ main(int argc, char **argv) {
 	Display *dpy;
 	CARD16 standby, suspend, off;
 	BOOL dpms_state;
-	int i, s, nlocks, nscreens;
-	int count_fonts;
-	char **font_names;
+	int s, nlocks, nscreens;
+  config_t cfg;
+  const char *str;
+  int i;
+
+  config_init(&cfg);
+
+  const char *config_file = strcat(getenv("XDG_CONFIG_HOME"), slock_cfg);
+
+  // read from config file if it exists
+  if (config_read_file(&cfg, config_file)) {
+    if (config_lookup_int(&cfg, "failonclear", &i))
+      failonclear = i;
+    if (config_lookup_int(&cfg, "enableblur", &i))
+      enableblur = i;
+    if (config_lookup_int(&cfg, "blurradius", &i))
+      blurradius = i;
+    if (config_lookup_int(&cfg, "enablepixel", &i))
+      enablepixel = i;
+    if (config_lookup_int(&cfg, "pixelsize", &i))
+      pixelsize = i;
+    if (config_lookup_int(&cfg, "pixelsize", &i))
+      timetocancel = i;
+    if (config_lookup_int(&cfg, "failcount", &i))
+      failcount = i;
+    if (config_lookup_int(&cfg, "controlkeyclear", &i))
+      controlkeyclear = i;
+    if (config_lookup_int(&cfg, "monitortime", &i))
+      monitortime = i;
+    if (config_lookup_string(&cfg, "user", &str))
+      user = strdup(str);
+    if (config_lookup_string(&cfg, "group", &str))
+      group = strdup(str);
+    if (config_lookup_string(&cfg, "color_foreground", &str))
+      colorname[FOREGROUND] = strdup(str);
+    if (config_lookup_string(&cfg, "color_init", &str))
+      colorname[INIT] = strdup(str);
+    if (config_lookup_string(&cfg, "color_input", &str))
+      colorname[INPUT] = strdup(str);
+    if (config_lookup_string(&cfg, "color_inputalt", &str))
+      colorname[INPUT_ALT] = strdup(str);
+    if (config_lookup_string(&cfg, "color_failed", &str))
+      colorname[FAILED] = strdup(str);
+    if (config_lookup_string(&cfg, "color_caps", &str))
+      colorname[CAPS] = strdup(str);
+    if (config_lookup_string(&cfg, "icon_font", &str))
+      icon_font = strdup(str);
+    if (config_lookup_string(&cfg, "display_icon", &str))
+      display_icon = strdup(str);
+    if (config_lookup_string(&cfg, "text_font", &str))
+      text_font = strdup(str);
+    if (config_lookup_string(&cfg, "display_text", &str))
+      display_text = strdup(str);
+    if (config_lookup_string(&cfg, "failcommand", &str))
+      failcommand = strdup(str);
+  }
+
+
 
 	ARGBEGIN {
 	case 'v':
@@ -513,14 +567,6 @@ main(int argc, char **argv) {
 	case 'm':
 		display_text = EARGF(usage());
 		break;
-	case 'f':
-		if (!(dpy = XOpenDisplay(NULL)))
-			die("slock: cannot open display\n");
-		font_names = XListFonts(dpy, "*", 10000 /* list 10000 fonts*/, &count_fonts);
-		for (i=0; i<count_fonts; i++) {
-			fprintf(stderr, "%s\n", *(font_names+i));
-		}
-		return 0;
 	default:
 		usage();
 	} ARGEND
@@ -567,19 +613,19 @@ main(int argc, char **argv) {
 	imlib_copy_drawable_to_image(0,0,0,scr->width,scr->height,0,0,1);
 
 
-  if (enable_blur > 0) {
+  if (enableblur > 0) {
     /*Blur function*/
-    imlib_image_blur(blurRadius);
+    imlib_image_blur(blurradius);
   }
 
-  if (enable_pixel > 0) {
+  if (enablepixel > 0) {
     /*Pixelation*/
     int width = scr->width;
     int height = scr->height;
     
-    for(int y = 0; y < height; y += pixelSize)
+    for(int y = 0; y < height; y += pixelsize)
     {
-      for(int x = 0; x < width; x += pixelSize)
+      for(int x = 0; x < width; x += pixelsize)
       {
         int red = 0;
         int green = 0;
@@ -588,9 +634,9 @@ main(int argc, char **argv) {
         Imlib_Color pixel; 
         Imlib_Color* pp;
         pp = &pixel;
-        for(int j = 0; j < pixelSize && j < height; j++)
+        for(int j = 0; j < pixelsize && j < height; j++)
         {
-          for(int i = 0; i < pixelSize && i < width; i++)
+          for(int i = 0; i < pixelsize && i < width; i++)
           {
             imlib_image_query_pixel(x+i,y+j,pp);
             red += pixel.red;
@@ -598,11 +644,11 @@ main(int argc, char **argv) {
             blue += pixel.blue;
           }
         }
-        red /= (pixelSize*pixelSize);
-        green /= (pixelSize*pixelSize);
-        blue /= (pixelSize*pixelSize);
+        red /= (pixelsize*pixelsize);
+        green /= (pixelsize*pixelsize);
+        blue /= (pixelsize*pixelsize);
         imlib_context_set_color(red,green,blue,pixel.alpha);
-        imlib_image_fill_rectangle(x,y,pixelSize,pixelSize);
+        imlib_image_fill_rectangle(x,y,pixelsize,pixelsize);
         red = 0;
         green = 0;
         blue = 0;
