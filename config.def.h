@@ -37,8 +37,11 @@ static int timetocancel = 3;
 static const char* icon_font = "FontAwesome:size=92";
 static const char* display_icon = "";
 
-static const char* text_font = "San Francisco:size=20";
+static const char* text_font = "Sans:size=20";
 static const char* display_text = "Type password to unlock";
+
+/* background image. Leave empty to use screen-capture */ 
+static const char* bgimage = "";
 
 /* number of failed password attempts until failcommand is executed.
    Set to 0 to disable */
@@ -57,7 +60,7 @@ static int enabledpms = 1;
 static int monitortime = 30;
 
 /* use PAM instead of shadow support */
-static int enablepam = 1;
+static int enablepam = 0;
 
 /* PAM service that's used for authentication */
 static const char* pam_service = "login";
