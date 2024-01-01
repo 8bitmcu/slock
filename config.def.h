@@ -40,3 +40,6 @@ static const int failcount = 10;
 
 /* command to be executed after [failcount] failed password attempts */
 static const char *failcommand = "shutdown -h now";
+
+/* allow control key to trigger fail on clear */
+static const int controlkeyclear = 0;
