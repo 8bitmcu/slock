@@ -20,7 +20,7 @@ And adds the following other changes:
 - **lock icon** instead of the dwm logo (configurable)
 - **quick cancel** using any keyboard key
 - **load image** to use as a background
-- **configuration file**; using libconfig to loads configuration from `$XDG_CONFIG_HOME/slock/slock.cfg` if it exists
+- **configuration file**; loads configuration from `$XDG_CONFIG_HOME/slock/slock.toml` if it exists
 
 
 Building and installing
@@ -29,7 +29,7 @@ Building and installing
 1. clone this repository locally on your machine
 2. Install libconfig from your package manager
 3. run `make clean && sudo make install` from within the repository folder
-4. copy and edit the config file: `cp /etc/slock/slock.cfg $XDG_CONFIG_HOME/slock/slock.cfg`
+4. copy and edit the config file: `cp /etc/slock/slock.toml $XDG_CONFIG_HOME/slock/slock.toml`
 
 Previews
 --------
