@@ -26,12 +26,12 @@
 #include <X11/XKBlib.h>
 #include <X11/Xmd.h>
 #include <Imlib2.h>
-#include <libconfig.h>
 #include <security/pam_appl.h>
 #include <security/pam_misc.h>
 
 #include "arg.h"
 #include "util.h"
+#include "tomlc99/toml.h"
 
 char *argv0;
 
@@ -565,71 +565,103 @@ main(int argc, char **argv) {
 	CARD16 standby, suspend, off;
 	BOOL dpms_state;
 	int s, nlocks, nscreens;
-  config_t cfg;
-  const char *str;
-  int i;
-
-  config_init(&cfg);
 
   const char *config_file = strcat(getenv("XDG_CONFIG_HOME"), slock_cfg);
 
-  // read from config file if it exists
-  if (config_read_file(&cfg, config_file)) {
-    if (config_lookup_int(&cfg, "failonclear", &i))
-      failonclear = i;
-    if (config_lookup_int(&cfg, "enableblur", &i))
-      enableblur = i;
-    if (config_lookup_int(&cfg, "blurradius", &i))
-      blurradius = i;
-    if (config_lookup_int(&cfg, "enablepixel", &i))
-      enablepixel = i;
-    if (config_lookup_int(&cfg, "pixelsize", &i))
-      pixelsize = i;
-    if (config_lookup_int(&cfg, "pixelsize", &i))
-      timetocancel = i;
-    if (config_lookup_int(&cfg, "failcount", &i))
-      failcount = i;
-    if (config_lookup_int(&cfg, "controlkeyclear", &i))
-      controlkeyclear = i;
-    if (config_lookup_int(&cfg, "enabledpms", &i))
-      enabledpms = i;
-    if (config_lookup_int(&cfg, "monitortime", &i))
-      monitortime = i;
-    if (config_lookup_int(&cfg, "enablepam", &i))
-      enablepam = i;
-    if (config_lookup_string(&cfg, "user", &str))
-      user = strdup(str);
-    if (config_lookup_string(&cfg, "group", &str))
-      group = strdup(str);
-    if (config_lookup_string(&cfg, "color_foreground", &str))
-      colorname[FOREGROUND] = strdup(str);
-    if (config_lookup_string(&cfg, "color_init", &str))
-      colorname[INIT] = strdup(str);
-    if (config_lookup_string(&cfg, "color_input", &str))
-      colorname[INPUT] = strdup(str);
-    if (config_lookup_string(&cfg, "color_inputalt", &str))
-      colorname[INPUT_ALT] = strdup(str);
-    if (config_lookup_string(&cfg, "color_failed", &str))
-      colorname[FAILED] = strdup(str);
-    if (config_lookup_string(&cfg, "color_caps", &str))
-      colorname[CAPS] = strdup(str);
-    if (config_lookup_string(&cfg, "icon_font", &str))
-      icon_font = strdup(str);
-    if (config_lookup_string(&cfg, "display_icon", &str))
-      display_icon = strdup(str);
-    if (config_lookup_string(&cfg, "text_font", &str))
-      text_font = strdup(str);
-    if (config_lookup_string(&cfg, "display_text", &str))
-      display_text = strdup(str);
-    if (config_lookup_string(&cfg, "failcommand", &str))
-      failcommand = strdup(str);
-    if (config_lookup_string(&cfg, "pam_service", &str))
-      pam_service = strdup(str);
-    if (config_lookup_string(&cfg, "bgimage", &str))
-      bgimage = strdup(str);
+  FILE* fp;
+  char errbuf[200];
+  fp = fopen(config_file, "r");
+
+  toml_table_t* conf;
+  toml_datum_t d;
+
+
+  if(fp) {
+    conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
+    fclose(fp);
+    if (conf) {
+      d = toml_int_in(conf, "failonclear");
+      if(d.ok)
+        failonclear = d.u.i;
+      d = toml_int_in(conf, "enableblur");
+      if(d.ok)
+        enableblur = d.u.i;
+      d = toml_int_in(conf, "blurradius");
+      if(d.ok)
+        blurradius = d.u.i;
+      d = toml_int_in(conf, "enablepixel");
+      if(d.ok)
+        enablepixel = d.u.i;
+      d = toml_int_in(conf, "pixelsize");
+      if(d.ok)
+        pixelsize = d.u.i;
+      d = toml_int_in(conf, "timetocancel");
+      if(d.ok)
+        timetocancel = d.u.i;
+      d = toml_int_in(conf, "failcount");
+      if(d.ok)
+        failcount = d.u.i;
+      d = toml_int_in(conf, "controlkeyclear");
+      if(d.ok)
+        controlkeyclear = d.u.i;
+      d = toml_int_in(conf, "enabledpms");
+      if(d.ok)
+        enabledpms = d.u.i;
+      d = toml_int_in(conf, "monitortime");
+      if(d.ok)
+        monitortime = d.u.i;
+      d = toml_int_in(conf, "enablepam");
+      if(d.ok)
+        enablepam = d.u.i;
+      d = toml_string_in(conf, "user");
+      if (d.ok)
+         user = d.u.s;
+      d = toml_string_in(conf, "group");
+      if (d.ok)
+         group = d.u.s;
+      d = toml_string_in(conf, "color_foreground");
+      if (d.ok)
+         colorname[FOREGROUND] = d.u.s;
+      d = toml_string_in(conf, "color_init");
+      if (d.ok)
+         colorname[INIT] = d.u.s;
+      d = toml_string_in(conf, "color_input");
+      if (d.ok)
+         colorname[INPUT] = d.u.s;
+      d = toml_string_in(conf, "color_inputalt");
+      if (d.ok)
+         colorname[INPUT_ALT] = d.u.s;
+      d = toml_string_in(conf, "color_failed");
+      if (d.ok)
+         colorname[FAILED] = d.u.s;
+      d = toml_string_in(conf, "color_caps");
+      if (d.ok)
+         colorname[CAPS] = d.u.s;
+      d = toml_string_in(conf, "icon_font");
+      if (d.ok)
+         icon_font = d.u.s;
+      d = toml_string_in(conf, "display_icon");
+      if (d.ok)
+         display_icon = d.u.s;
+      d = toml_string_in(conf, "text_font");
+      if (d.ok)
+         text_font = d.u.s;
+      d = toml_string_in(conf, "display_text");
+      if (d.ok)
+         display_text = d.u.s;
+      d = toml_string_in(conf, "failcommand");
+      if (d.ok)
+         failcommand = d.u.s;
+      d = toml_string_in(conf, "pam_service");
+      if (d.ok)
+         pam_service = d.u.s;
+      d = toml_string_in(conf, "bgimage");
+      if (d.ok)
+         bgimage = d.u.s;
+    }
+
+    toml_free(conf);
   }
-
-
 
 	ARGBEGIN {
 	case 'v':
@@ -684,6 +716,7 @@ main(int argc, char **argv) {
     int w = imlib_image_get_width();
     int h = imlib_image_get_height();
     image = imlib_create_cropped_scaled_image(0, 0, w, h, scr->width, scr->height);
+    imlib_context_set_image(image);
   }
   else {
     image = imlib_create_image(scr->width,scr->height);

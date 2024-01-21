@@ -3,7 +3,7 @@
 
 include config.mk
 
-SRC = slock.c ${COMPATSRC}
+SRC = slock.c ${COMPATSRC} tomlc99/toml.c
 OBJ = ${SRC:.c=.o}
 
 all: slock
@@ -17,10 +17,10 @@ config.h:
 	cp config.def.h $@
 
 slock: ${OBJ}
-	${CC} -o $@ ${OBJ} ${LDFLAGS}
+	${CC} -o $@ slock.o explicit_bzero.o toml.o ${LDFLAGS}
 
 clean:
-	rm -f slock ${OBJ} slock-${VERSION}.tar.gz
+	rm -f slock ${OBJ} toml.o slock-${VERSION}.tar.gz
 
 dist: clean
 	mkdir -p slock-${VERSION}
@@ -39,7 +39,7 @@ install: all
 	sed "s/VERSION/${VERSION}/g" <slock.1 >${DESTDIR}${MANPREFIX}/man1/slock.1
 	chmod 644 ${DESTDIR}${MANPREFIX}/man1/slock.1
 	mkdir -p /etc/slock
-	cp -f slock.cfg /etc/slock
+	cp -f slock.toml /etc/slock
 
 uninstall:
 	rm -f ${DESTDIR}${PREFIX}/bin/slock

@@ -1,5 +1,5 @@
 /* configuration file location, subdirectory of XDG_CONFIG_HOME */
-static const char* slock_cfg = "/slock/slock.cfg";
+static const char* slock_cfg = "/slock/slock.toml";
 
 /* user and group to drop privileges to */
 static const char* user  = "nobody";

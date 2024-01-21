@@ -1,63 +1,63 @@
 # Colors
-color_foreground = "#ffffff";
-color_init = "#2d2d2d";
-color_input = "#005577";
-color_inputalt = "#227799";
-color_failed = "#CC3333";
-color_caps = "red";
+color_foreground = "#ffffff"
+color_init = "#2d2d2d"
+color_input = "#005577"
+color_inputalt = "#227799"
+color_failed = "#CC3333"
+color_caps = "red"
 color_pam = "#9400D3"
 
 # user and group to drop privileges to 
-user = "nobody";
-group = "nobody";
+user = "nobody"
+group = "nobody"
 
 # treat a cleared input like a wrong password (color)
-failonclear = 1;
+failonclear = 1
 
 # enables blur
-enableblur = 0;
+enableblur = 0
 
 # set blur radius
-blurradius = 0;
+blurradius = 0
 
 # enables pixelation
-enablepixel = 1;
+enablepixel = 1
 
 # set pixelation radius 
-pixelsize = 8;
+pixelsize = 8
 
 # time in seconds to cancel lock with mouse movement or keyboard input
-timetocancel = 3;
+timetocancel = 3
 
 # icon and font that will be used
-icon_font = "FontAwesome:size=92";
-display_icon = "";
+icon_font = "FontAwesome:size=92"
+display_icon = ""
 
 # display text and font that will be used
-text_font = "San Francisco:size=20";
-display_text = "Type password to unlock";
+text_font = "San Francisco:size=20"
+display_text = "Type password to unlock"
 
 # background image. Leave empty to use screen-capture
-bgimage = "";
+bgimage = ""
 
 # number of failed password attempts until failcommand is executed.
 # set to 0 to disable
-failcount = 10;
+failcount = 10
 
 # command to be executed after [failcount] failed password attempts
-failcommand = "shutdown -h now";
+failcommand = "shutdown -h now"
 
 # allow control key to trigger fail on clear
-controlkeyclear = 0;
+controlkeyclear = 0
 
 # turn off monitor after a set timeout
-enabledpms = 1;
+enabledpms = 1
 
 # time in seconds before the monitor shuts down
-monitortime = 30;
+monitortime = 30
 
 # use PAM instead of shadow support
-enablepam = 0;
+enablepam = 0
 
 # PAM service that's used for authentication
-pam_service = "login";
+pam_service = "login"
