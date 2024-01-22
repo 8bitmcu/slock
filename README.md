@@ -22,14 +22,14 @@ And adds the following other changes:
 - **load image** to use as a background
 - **configuration file**; loads configuration from `$XDG_CONFIG_HOME/slock/slock.toml` if it exists
 
+Have a look at [slock.toml](slock.toml)!
 
 Building and installing
 -----------------------
 
 1. clone this repository locally on your machine
-2. Install libconfig from your package manager
-3. run `make clean && sudo make install` from within the repository folder
-4. copy and edit the config file: `cp /etc/slock/slock.toml $XDG_CONFIG_HOME/slock/slock.toml`
+2. run `make clean && sudo make install` from within the repository folder
+3. copy and edit the config file: `cp /etc/slock/slock.toml $XDG_CONFIG_HOME/slock/slock.toml`
 
 Previews
 --------
