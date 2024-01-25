@@ -552,6 +552,23 @@ usage(void)
 	die("usage: slock [-v] [cmd [arg ...]]\n");
 }
 
+static void
+cfg_read_str(toml_table_t* conf, char* key, const char** dest)
+{
+  toml_datum_t d = toml_string_in(conf, key);
+  if (d.ok)
+    *dest = strdup(d.u.s);
+  free(d.u.s);
+}
+
+static void
+cfg_read_int(toml_table_t* conf, char* key, int* dest)
+{
+  toml_datum_t d = toml_int_in(conf, key);
+  if (d.ok)
+    *dest = d.u.i;
+}
+
 int
 main(int argc, char **argv) {
 	struct xrandr rr;
@@ -567,100 +584,41 @@ main(int argc, char **argv) {
 	int s, nlocks, nscreens;
 
   const char *config_file = strcat(getenv("XDG_CONFIG_HOME"), slock_cfg);
-
-  FILE* fp;
-  char errbuf[200];
-  fp = fopen(config_file, "r");
-
-  toml_table_t* conf;
-  toml_datum_t d;
-
-
+  FILE* fp = fopen(config_file, "r");
   if(fp) {
-    conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
+    char errbuf[200];
+    toml_table_t* conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
     fclose(fp);
-    if (conf) {
-      d = toml_int_in(conf, "failonclear");
-      if(d.ok)
-        failonclear = d.u.i;
-      d = toml_int_in(conf, "enableblur");
-      if(d.ok)
-        enableblur = d.u.i;
-      d = toml_int_in(conf, "blurradius");
-      if(d.ok)
-        blurradius = d.u.i;
-      d = toml_int_in(conf, "enablepixel");
-      if(d.ok)
-        enablepixel = d.u.i;
-      d = toml_int_in(conf, "pixelsize");
-      if(d.ok)
-        pixelsize = d.u.i;
-      d = toml_int_in(conf, "timetocancel");
-      if(d.ok)
-        timetocancel = d.u.i;
-      d = toml_int_in(conf, "failcount");
-      if(d.ok)
-        failcount = d.u.i;
-      d = toml_int_in(conf, "controlkeyclear");
-      if(d.ok)
-        controlkeyclear = d.u.i;
-      d = toml_int_in(conf, "enabledpms");
-      if(d.ok)
-        enabledpms = d.u.i;
-      d = toml_int_in(conf, "monitortime");
-      if(d.ok)
-        monitortime = d.u.i;
-      d = toml_int_in(conf, "enablepam");
-      if(d.ok)
-        enablepam = d.u.i;
-      d = toml_string_in(conf, "user");
-      if (d.ok)
-         user = d.u.s;
-      d = toml_string_in(conf, "group");
-      if (d.ok)
-         group = d.u.s;
-      d = toml_string_in(conf, "color_foreground");
-      if (d.ok)
-         colorname[FOREGROUND] = d.u.s;
-      d = toml_string_in(conf, "color_init");
-      if (d.ok)
-         colorname[INIT] = d.u.s;
-      d = toml_string_in(conf, "color_input");
-      if (d.ok)
-         colorname[INPUT] = d.u.s;
-      d = toml_string_in(conf, "color_inputalt");
-      if (d.ok)
-         colorname[INPUT_ALT] = d.u.s;
-      d = toml_string_in(conf, "color_failed");
-      if (d.ok)
-         colorname[FAILED] = d.u.s;
-      d = toml_string_in(conf, "color_caps");
-      if (d.ok)
-         colorname[CAPS] = d.u.s;
-      d = toml_string_in(conf, "icon_font");
-      if (d.ok)
-         icon_font = d.u.s;
-      d = toml_string_in(conf, "display_icon");
-      if (d.ok)
-         display_icon = d.u.s;
-      d = toml_string_in(conf, "text_font");
-      if (d.ok)
-         text_font = d.u.s;
-      d = toml_string_in(conf, "display_text");
-      if (d.ok)
-         display_text = d.u.s;
-      d = toml_string_in(conf, "failcommand");
-      if (d.ok)
-         failcommand = d.u.s;
-      d = toml_string_in(conf, "pam_service");
-      if (d.ok)
-         pam_service = d.u.s;
-      d = toml_string_in(conf, "bgimage");
-      if (d.ok)
-         bgimage = d.u.s;
-    }
 
-    toml_free(conf);
+    if (conf) {
+      cfg_read_int(conf, "failonclear", &failonclear);
+      cfg_read_int(conf, "enableblur", &enableblur);
+      cfg_read_int(conf, "blurradius", &blurradius);
+      cfg_read_int(conf, "enablepixel", &enablepixel);
+      cfg_read_int(conf, "pixelsize", &pixelsize);
+      cfg_read_int(conf, "timetocancel", &timetocancel);
+      cfg_read_int(conf, "failcount", &failcount);
+      cfg_read_int(conf, "controlkeyclear", &controlkeyclear);
+      cfg_read_int(conf, "enabledpms", &enabledpms);
+      cfg_read_int(conf, "monitortime", &monitortime);
+      cfg_read_int(conf, "enablepam", &enablepam);
+      cfg_read_str(conf, "user", &user);
+      cfg_read_str(conf, "group", &group);
+      cfg_read_str(conf, "color_foreground", &colorname[FOREGROUND]);
+      cfg_read_str(conf, "color_init", &colorname[INIT]);
+      cfg_read_str(conf, "color_input", &colorname[INPUT]);
+      cfg_read_str(conf, "color_inputalt", &colorname[INPUT_ALT]);
+      cfg_read_str(conf, "color_failed", &colorname[FAILED]);
+      cfg_read_str(conf, "color_caps", &colorname[CAPS]);
+      cfg_read_str(conf, "icon_font", &icon_font);
+      cfg_read_str(conf, "display_icon", &display_icon);
+      cfg_read_str(conf, "text_font", &text_font);
+      cfg_read_str(conf, "display_text", &display_text);
+      cfg_read_str(conf, "failcommand", &failcommand);
+      cfg_read_str(conf, "pam_service", &pam_service);
+      cfg_read_str(conf, "bgimage", &bgimage);
+      toml_free(conf);
+    }
   }
 
 	ARGBEGIN {
