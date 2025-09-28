@@ -14,6 +14,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <spawn.h>
 #include <sys/types.h>
 #include <X11/extensions/Xrandr.h>
 #include <X11/extensions/Xinerama.h>
@@ -410,6 +411,9 @@ readpw(Display *dpy, struct xrandr *rr, struct lock **locks, int nscreens,
 				if (num && (len + num < sizeof(passwd))) {
 					memcpy(passwd + len, buf, num);
 					len += num;
+				} else if (buf[0] == '\025') { /* ctrl-u clears input */
+					explicit_bzero(&passwd, sizeof(passwd));
+					len = 0;
 				}
 				break;
 			}
@@ -818,18 +822,13 @@ main(int argc, char **argv) {
 
 	/* run post-lock command */
 	if (argc > 0) {
-		switch (fork()) {
-		case -1:
-			cleanup_cfg();
-			die("slock: fork failed: %s\n", strerror(errno));
-		case 0:
-			if (close(ConnectionNumber(dpy)) < 0) {
-				cleanup_cfg();
-				die("slock: close: %s\n", strerror(errno));
-			}
-			execvp(argv[0], argv);
-			fprintf(stderr, "slock: execvp %s: %s\n", argv[0], strerror(errno));
-			_exit(1);
+		pid_t pid;
+		extern char **environ;
+		int err = posix_spawnp(&pid, argv[0], NULL, NULL, argv, environ);
+		if (err) {
+      cleanup_cfg();
+			die("slock: failed to execute post-lock command: %s: %s\n",
+			    argv[0], strerror(err));
 		}
 	}
 

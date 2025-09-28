@@ -1,6 +1,6 @@
 slock - simple screen locker (fork)
 ===================================
-A bloated fork of suckless [slock](https://tools.suckless.org/slock) with lots of customizations.
+A **bloated** fork of suckless [slock](https://tools.suckless.org/slock) 1.6 with lots of customizations.
 
 
 This fork merges the following patches: 
