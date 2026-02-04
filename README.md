@@ -27,7 +27,10 @@ Have a look at [slock.toml](slock.toml)!
 Building and installing
 -----------------------
 
-1. clone this repository locally on your machine
+1. clone this repository with submodules locally on your machine:
+```Bash
+git clone --recursive https://github.com/8bitmcu/slock.git
+```
 2. run `make clean && sudo make install` from within the repository folder
 3. copy and edit the config file: `cp /etc/slock/slock.toml $XDG_CONFIG_HOME/slock/slock.toml`
 
