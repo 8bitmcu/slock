@@ -481,7 +481,6 @@ lockscreen(Display *dpy, struct xrandr *rr, int screen)
 			imlib_context_set_colormap(DefaultColormap(dpy, lock->screen));
 			imlib_context_set_drawable(lock->bgmap);
 			imlib_render_image_on_drawable(0, 0);
-			imlib_free_image();
 	}
 
 	for (i = 0; i < NUMCOLS; i++) {
@@ -574,12 +573,15 @@ usage(void)
 	die("usage: slock [-v] [cmd [arg ...]]\n");
 }
 
-static void
-cfg_read_str(toml_table_t* conf, char* key, const char** dest)
+static int
+cfg_read_str(toml_table_t *conf, const char *key, char **dest)
 {
 	toml_datum_t d = toml_string_in(conf, key);
-	if (d.ok)
-		*dest = d.u.s;
+	if (!d.ok) {
+		return 0;
+	}
+	*dest = d.u.s;
+	return 1;
 }
 
 static void
@@ -604,8 +606,35 @@ main(int argc, char **argv) {
 	BOOL dpms_state;
 	int s, nlocks, nscreens;
 
-	const char *config_file = strcat(getenv("XDG_CONFIG_HOME"), slock_cfg);
-	FILE* fp = fopen(config_file, "r");
+	user = strdup("nobody");
+	group = strdup("nobody");
+	pam_service = strdup("login");
+	icon_font = strdup("FontAwesome:size=92");
+	display_icon = strdup("");
+	text_font = strdup("Sans:size=20");
+	display_text = strdup("Type password to unlock");
+	failcommand = strdup("shutdown -h now");
+	bgimage = strdup("");
+
+	for (int i = 0; i < NUMCOLS; i++) {
+		colorname[i] = strdup(default_colorname[i]);
+	}
+
+	char path[PATH_MAX];
+	const char *xdg = getenv("XDG_CONFIG_HOME");
+	const char *home = getenv("HOME");
+
+	if (xdg && xdg[0] != '\0') {
+		/* use xdg_config_home if set */
+		snprintf(path, sizeof(path), "%s%s", xdg, slock_cfg);
+	} else if (home && home[0] != '\0') {
+		/* fallback to ~/.config */
+		snprintf(path, sizeof(path), "%s/.config%s", home, slock_cfg);
+	}
+
+	char* tmp;
+
+	FILE* fp = fopen(path, "r");
 	if(fp) {
 		char errbuf[200];
 		toml_table_t* conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
@@ -623,21 +652,69 @@ main(int argc, char **argv) {
 			cfg_read_int(conf, "enabledpms", &enabledpms);
 			cfg_read_int(conf, "monitortime", &monitortime);
 			cfg_read_int(conf, "enablepam", &enablepam);
-			cfg_read_str(conf, "user", &user);
-			cfg_read_str(conf, "group", &group);
-			cfg_read_str(conf, "color_foreground", &colorname[FOREGROUND]);
-			cfg_read_str(conf, "color_init", &colorname[INIT]);
-			cfg_read_str(conf, "color_input", &colorname[INPUT]);
-			cfg_read_str(conf, "color_inputalt", &colorname[INPUT_ALT]);
-			cfg_read_str(conf, "color_failed", &colorname[FAILED]);
-			cfg_read_str(conf, "color_caps", &colorname[CAPS]);
-			cfg_read_str(conf, "icon_font", &icon_font);
-			cfg_read_str(conf, "display_icon", &display_icon);
-			cfg_read_str(conf, "text_font", &text_font);
-			cfg_read_str(conf, "display_text", &display_text);
-			cfg_read_str(conf, "failcommand", &failcommand);
-			cfg_read_str(conf, "pam_service", &pam_service);
-			cfg_read_str(conf, "bgimage", &bgimage);
+
+
+			if (cfg_read_str(conf, "user", &tmp)) {
+				free((void *) user);
+				user = tmp;
+			}
+			if (cfg_read_str(conf, "group", &tmp)) {
+				free((void *) group);
+				group = tmp;
+			}
+			if (cfg_read_str(conf, "color_foreground", &tmp)) {
+				free((void *) colorname[FOREGROUND]);
+				colorname[FOREGROUND] = tmp;
+			}
+			if (cfg_read_str(conf, "color_init", &tmp)) {
+				free((void *) colorname[INIT]);
+				colorname[INIT] = tmp;
+			}
+			if (cfg_read_str(conf, "color_input", &tmp)) {
+				free((void *) colorname[INPUT]);
+				colorname[INPUT] = tmp;
+			}
+			if (cfg_read_str(conf, "color_inputalt", &tmp)) {
+				free((void *) colorname[INPUT_ALT]);
+				colorname[INPUT_ALT] = tmp;
+			}
+			if (cfg_read_str(conf, "color_failed", &tmp)) {
+				free((void *) colorname[FAILED]);
+				colorname[FAILED] = tmp;
+			}
+			if (cfg_read_str(conf, "color_caps", &tmp)) {
+				free((void *) colorname[CAPS]);
+				colorname[CAPS] = tmp;
+			}
+			if (cfg_read_str(conf, "icon_font", &tmp)) {
+				free((void *) icon_font);
+				icon_font = tmp;
+			}
+			if (cfg_read_str(conf, "display_icon", &tmp)) {
+				free((void *) display_icon);
+				display_icon = tmp;
+			}
+			if (cfg_read_str(conf, "text_font", &tmp)) {
+				free((void *) text_font);
+				text_font = tmp;
+			}
+			if (cfg_read_str(conf, "display_text", &tmp)) {
+				free((void *) display_text);
+				display_text = tmp;
+			}
+			if (cfg_read_str(conf, "failcommand", &tmp)) {
+				free((void *) failcommand);
+				failcommand = tmp;
+			}
+			if (cfg_read_str(conf, "pam_service", &tmp)) {
+				free((void *) pam_service);
+				pam_service = tmp;
+			}
+			if (cfg_read_str(conf, "bgimage", &tmp)) {
+				free((void *) bgimage);
+				bgimage = tmp;
+			}
+
 			toml_free(conf);
 		}
 	}
@@ -648,7 +725,8 @@ main(int argc, char **argv) {
 		cleanup_cfg();
 		return 0;
 	case 'm':
-		display_text = EARGF(usage());
+		free((void *)display_text);
+		display_text = strdup(EARGF(usage()));
 		break;
 	default:
 		cleanup_cfg();
@@ -728,44 +806,24 @@ main(int argc, char **argv) {
 		imlib_image_blur(blurradius);
 	}
 
-	if (enablepixel > 0) {
-		/*Pixelation*/
-		int width = scr->width;
-		int height = scr->height;
+	if (enablepixel > 0 && pixelsize > 1) {
+		int w = scr->width;
+		int h = scr->height;
 		
-		for(int y = 0; y < height; y += pixelsize)
-		{
-			for(int x = 0; x < width; x += pixelsize)
-			{
-				int red = 0;
-				int green = 0;
-				int blue = 0;
-
-				Imlib_Color pixel;
-				Imlib_Color* pp;
-				pp = &pixel;
-				for(int j = 0; j < pixelsize && j < height; j++)
-				{
-					for(int i = 0; i < pixelsize && i < width; i++)
-					{
-						imlib_image_query_pixel(x+i,y+j,pp);
-						red += pixel.red;
-						green += pixel.green;
-						blue += pixel.blue;
-					}
-				}
-				red /= (pixelsize*pixelsize);
-				green /= (pixelsize*pixelsize);
-				blue /= (pixelsize*pixelsize);
-				imlib_context_set_color(red,green,blue,pixel.alpha);
-				imlib_image_fill_rectangle(x,y,pixelsize,pixelsize);
-				red = 0;
-				green = 0;
-				blue = 0;
-			}
-		}
+		Imlib_Image tiny = imlib_create_cropped_scaled_image(0, 0, w, h, w / pixelsize, h / pixelsize);
+		
+		imlib_context_set_image(tiny);
+		Imlib_Image pixelated = imlib_create_cropped_scaled_image(0, 0, w / pixelsize, h / pixelsize, w, h);
+		
+		imlib_free_image();
+		
+		imlib_context_set_image(image); 
+		imlib_free_image(); 
+		
+		image = pixelated;
+		imlib_context_set_image(image);
 	}
-	
+
 	/* check for Xrandr support */
 	rr.active = XRRQueryExtension(dpy, &rr.evbase, &rr.errbase);
 
@@ -784,11 +842,19 @@ main(int argc, char **argv) {
 		else
 			break;
 	}
+
+	if (image) {
+		imlib_context_set_image(image);
+		imlib_free_image();
+	}
+
 	XSync(dpy, 0);
 
 	/* did we manage to lock everything? */
-	if (nlocks != nscreens)
+	if (nlocks != nscreens) {
+		cleanup_cfg();
 		return 1;
+	}
 
 	if (enabledpms) {
 		/* DPMS magic to disable the monitor */
@@ -836,9 +902,15 @@ main(int argc, char **argv) {
 	readpw(dpy, &rr, locks, nscreens, hash);
 
 	for (nlocks = 0, s = 0; s < nscreens; s++) {
-		XFreePixmap(dpy, locks[s]->drawable);
-		XFreeGC(dpy, locks[s]->gc);
+		if (locks[s]) {
+			XFreePixmap(dpy, locks[s]->drawable);
+			XFreeGC(dpy, locks[s]->gc);
+			if (locks[s]->bgmap)
+				XFreePixmap(dpy, locks[s]->bgmap);
+			free(locks[s]);
+		}
 	}
+	free(locks);
 
 	if (enabledpms) {
 		/* reset DPMS values to inital ones */

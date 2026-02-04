@@ -2,10 +2,12 @@
 static const char* slock_cfg = "/slock/slock.toml";
 
 /* user and group to drop privileges to */
-static const char* user  = "nobody";
-static const char* group = "nobody";
+static const char* user  = NULL;
+static const char* group = NULL;
 
-static const char* colorname[NUMCOLS] = {
+static const char* colorname[NUMCOLS];
+
+static const char* default_colorname[NUMCOLS] = {
   [FOREGROUND] = "#ffffff",
 	[INIT] =   "#2d2d2d",     /* after initialization */
 	[INPUT] =  "#005577",   /* during input */
@@ -30,25 +32,24 @@ static int enablepixel = 1;
 /*Set pixelation radius*/
 static int pixelsize = 8;
 
-
 /* time in seconds to cancel lock with mouse movement or keyboard input */
 static int timetocancel = 3;
 
-static const char* icon_font = "FontAwesome:size=92";
-static const char* display_icon = "";
+static const char* icon_font = NULL;
+static const char* display_icon = NULL;
 
-static const char* text_font = "Sans:size=20";
-static const char* display_text = "Type password to unlock";
+static const char* text_font = NULL;
+static const char* display_text = NULL;
 
 /* background image. Leave empty to use screen-capture */ 
-static const char* bgimage = "";
+static const char* bgimage =  NULL;
 
 /* number of failed password attempts until failcommand is executed.
    Set to 0 to disable */
 static int failcount = 10;
 
 /* command to be executed after [failcount] failed password attempts */
-static const char* failcommand = "shutdown -h now";
+static const char* failcommand = NULL;
 
 /* allow control key to trigger fail on clear */
 static int controlkeyclear = 0;
@@ -63,4 +64,4 @@ static int monitortime = 30;
 static int enablepam = 0;
 
 /* PAM service that's used for authentication */
-static const char* pam_service = "login";
+static const char* pam_service = NULL;
